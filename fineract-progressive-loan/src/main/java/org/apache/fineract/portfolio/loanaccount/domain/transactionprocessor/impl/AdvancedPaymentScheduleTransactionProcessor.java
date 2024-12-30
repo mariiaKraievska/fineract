@@ -1222,12 +1222,13 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
                 installment.updateInterestCharged(BigDecimal.ZERO);
             });
 
-            final BigDecimal totalInstallmentsPrincipal = installments.stream().map(LoanRepaymentScheduleInstallment::getPrincipal)
-                    .reduce(ZERO, BigDecimal::add);
-            final Money amountToEditLastInstallment = loanTransaction.getLoan().getPrincipal().minus(totalInstallmentsPrincipal);
-            final int lastInstallmentIndex = installments.size() - 1;
-            installments.get(lastInstallmentIndex)
-                    .updatePrincipal(installments.get(lastInstallmentIndex).getPrincipal().add(amountToEditLastInstallment.getAmount()));
+            final Money amountToEditLastInstallment = loanTransaction.getLoan().getPrincipal().minus(installments.stream()
+                    .filter(i -> !i.isAdditional()).map(LoanRepaymentScheduleInstallment::getPrincipal).reduce(ZERO, BigDecimal::add));
+
+            if (amountToEditLastInstallment.getAmount().signum() != 0) {
+                installments.stream().filter(i -> !i.isAdditional() && !i.isObligationsMet()).reduce((first, second) -> second)
+                        .ifPresent(last -> last.updatePrincipal(last.getPrincipal().add(amountToEditLastInstallment.getAmount())));
+            }
         }
     }
 
